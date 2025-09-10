@@ -30,8 +30,12 @@ func main() {
     sdk := amex.NewSDK(config)
     ctx := context.Background()
     
-    // Create a payment token
-    tokenReq := &amex.TokenRequest{
+    // Authorize a transaction
+    transactionReq := &amex.TransactionRequest{
+        Amount:      100.00,
+        Currency:    "USD",
+        MerchantID:  "merchant_123",
+        Description: "Test transaction",
         CardDetails: &amex.CardDetails{
             Number:      "4111111111111111",
             ExpiryMonth: 12,
@@ -39,32 +43,40 @@ func main() {
             CVV:         "123",
             HolderName:  "John Doe",
         },
-        CustomerID: "customer_123",
+        CaptureMode: "manual",
+        CVVCheck:    true,
+        AVSCheck:    true,
     }
     
-    token, err := sdk.Tokens.CreateToken(ctx, tokenReq)
+    transaction, err := sdk.Transactions.AuthorizeTransaction(ctx, transactionReq)
     if err != nil {
         log.Fatal(err)
     }
     
-    // Create a payment
-    paymentReq := &amex.PaymentRequest{
-        Amount:     100.00,
-        Currency:   "USD",
-        MerchantID: "merchant_123",
-        CardToken:  token.Token,
+    // Capture the transaction
+    captureReq := &amex.CaptureTransactionRequest{
+        Amount: &[]float64{50.00}[0], // Partial capture
     }
     
-    payment, err := sdk.Payments.CreatePayment(ctx, paymentReq)
+    captured, err := sdk.Transactions.CaptureTransaction(ctx, transaction.ID, captureReq)
     if err != nil {
         log.Fatal(err)
     }
     
-    log.Printf("Payment created: %s", payment.ID)
+    log.Printf("Transaction captured: %s", captured.ID)
 }
 ```
 
 ## Features
+
+### Transaction Processing
+- **Authorize transactions** with comprehensive validation and fraud checks
+- **Capture transactions** (full or partial amounts)
+- **Void authorized transactions** before capture
+- **Refund transactions** with detailed tracking
+- **List and search transactions** with flexible filtering
+- **Get transaction status** and details
+- **Advanced fraud protection** with CVV and AVS checks
 
 ### Payment Processing
 - Create payments with card details or tokens
@@ -99,6 +111,110 @@ config := &amex.Config{
 ```
 
 ## API Reference
+
+### Transactions
+
+#### Authorize Transaction
+```go
+transactionReq := &amex.TransactionRequest{
+    Amount:      100.00,
+    Currency:    "USD",
+    MerchantID:  "merchant_123",
+    Description: "Test transaction",
+    Reference:   "order_123",
+    CardDetails: &amex.CardDetails{
+        Number:      "4111111111111111",
+        ExpiryMonth: 12,
+        ExpiryYear:  2025,
+        CVV:         "123",
+        HolderName:  "John Doe",
+    },
+    // Or use a card token instead
+    // CardToken: "token_123",
+    BillingAddr: &amex.Address{
+        Line1:      "123 Main St",
+        City:       "New York",
+        State:      "NY",
+        PostalCode: "10001",
+        Country:    "US",
+    },
+    CaptureMode: "manual", // "auto" or "manual"
+    CVVCheck:    true,
+    AVSCheck:    true,
+}
+
+transaction, err := sdk.Transactions.AuthorizeTransaction(ctx, transactionReq)
+```
+
+#### Capture Transaction
+```go
+// Capture full amount
+captured, err := sdk.Transactions.CaptureTransaction(ctx, transactionID, nil)
+
+// Capture partial amount
+captureReq := &amex.CaptureTransactionRequest{
+    Amount:    &[]float64{50.00}[0],
+    Reference: "partial_capture_123",
+}
+captured, err := sdk.Transactions.CaptureTransaction(ctx, transactionID, captureReq)
+```
+
+#### Void Transaction
+```go
+voidReq := &amex.VoidTransactionRequest{
+    Reason:    "Customer cancelled order",
+    Reference: "void_ref_123",
+}
+voided, err := sdk.Transactions.VoidTransaction(ctx, transactionID, voidReq)
+```
+
+#### Refund Transaction
+```go
+refundReq := &amex.RefundTransactionRequest{
+    Amount:    25.00,
+    Reason:    "Customer requested refund",
+    Reference: "refund_ref_123",
+}
+refund, err := sdk.Transactions.RefundTransaction(ctx, transactionID, refundReq)
+```
+
+#### Get Transaction
+```go
+transaction, err := sdk.Transactions.GetTransaction(ctx, transactionID)
+
+// Or get just the status
+status, err := sdk.Transactions.GetTransactionStatus(ctx, transactionID)
+```
+
+#### List Transactions
+```go
+listReq := &amex.ListTransactionsRequest{
+    MerchantID: "merchant_123",
+    Status:     "authorized",
+    StartDate:  "2023-01-01",
+    EndDate:    "2023-01-31",
+    Currency:   "USD",
+    Limit:      10,
+    Offset:     0,
+    SortBy:     "created_at",
+    SortOrder:  "desc",
+}
+
+transactions, err := sdk.Transactions.ListTransactions(ctx, listReq)
+```
+
+#### Search Transactions
+```go
+searchReq := &amex.SearchTransactionsRequest{
+    Query:      "order_123",
+    MerchantID: "merchant_123",
+    StartDate:  "2023-01-01",
+    EndDate:    "2023-01-31",
+    Limit:      20,
+}
+
+results, err := sdk.Transactions.SearchTransactions(ctx, searchReq)
+```
 
 ### Payments
 
@@ -202,10 +318,10 @@ if err != nil {
 
 ## Examples
 
-Check the `examples/` directory for more comprehensive examples:
+Check the `examples/` directory for comprehensive examples:
 
 - `examples/basic/main.go` - Basic usage examples
-- More examples coming soon...
+- `examples/transactions/main.go` - Complete transaction API examples including authorize, capture, void, refund, and search operations
 
 ## Testing
 

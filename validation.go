@@ -127,6 +127,52 @@ func IsSupportedCurrency(currency string) bool {
 	return false
 }
 
+// ValidateTransactionRequest validates a transaction request
+func ValidateTransactionRequest(req *TransactionRequest) error {
+	if req == nil {
+		return errors.New("transaction request cannot be nil")
+	}
+
+	// Validate amount
+	if req.Amount <= 0 {
+		return ErrInvalidAmount
+	}
+
+	// Validate currency
+	if req.Currency == "" {
+		return ErrInvalidCurrency
+	}
+	if len(req.Currency) != 3 {
+		return fmt.Errorf("%w: currency must be 3 characters", ErrInvalidCurrency)
+	}
+
+	// Validate merchant ID
+	if strings.TrimSpace(req.MerchantID) == "" {
+		return errors.New("merchant ID cannot be empty")
+	}
+
+	// Validate that either card token or card details are provided
+	if req.CardToken == "" && req.CardDetails == nil {
+		return errors.New("either card token or card details must be provided")
+	}
+
+	// If card details are provided, validate them
+	if req.CardDetails != nil {
+		if err := ValidateCardDetails(req.CardDetails); err != nil {
+			return fmt.Errorf("invalid card details: %w", err)
+		}
+	}
+
+	// Validate capture mode if provided
+	if req.CaptureMode != "" {
+		if req.CaptureMode != "auto" && req.CaptureMode != "manual" {
+			return errors.New("capture mode must be 'auto' or 'manual'")
+		}
+	}
+
+	return nil
+}
+
 // FormatAmount formats an amount to 2 decimal places
 func FormatAmount(amount float64) float64 {
 	return float64(int(amount*100)) / 100
